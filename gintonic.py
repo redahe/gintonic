@@ -3,6 +3,7 @@
 import os
 import curses
 import curses.textpad as textpad
+import collections
 
 
 mainwindow = curses.initscr()
@@ -13,6 +14,8 @@ data = [('NES', 'sobaka'), ('NES', 'glaza'), ('MegaDrive', 'konskiy look'),
 
 for i in range(len(data)):
     data[i] = (data[i][0], '_'+str(i)+'_'+data[i][1])
+
+search_history = collections.deque(maxlen=100)
 
 
 class SearchWindow(object):
@@ -37,8 +40,12 @@ class SearchWindow(object):
         curses.curs_set(1)
         curses.setsyx(2, 2)
         curses.doupdate()
-        self.text.edit(self._handle_key)
+        self.inp.erase()
+        res = self.text.edit(self._handle_key)
+        # self.text.
+        search_history.append(res)
         curses.curs_set(0)
+        return res.strip()
 
 
 class GameMenu(object):
@@ -57,18 +64,20 @@ class GameMenu(object):
         return self.offset + self.pos
 
     def draw(self):
-        step = 0
-        for i in range(self.offset, len(data)):
+        pos = self.offset
+        for i in range(self.syswin.getmaxyx()[0]-2):
             style = 0
-            if i == self.list_pos():
+            if pos == self.list_pos():
                 style = curses.A_STANDOUT
-            dat = (' ' + data[i][1] + ' ' * 100)[:self.gameswin.getmaxyx()[1] - 3] + ' '
-            self.gameswin.addstr(step + 1, 1, dat, style)
-            dat = (' ' + data[i][0] + ' ' * 100)[:self.syswin.getmaxyx()[1] - 3] + ' '
-            self.syswin.addstr(step + 1, 1, dat, style)
-            step += 1
-            if step >= self.syswin.getmaxyx()[0]-2:
-                break
+            if pos < len(data):
+                dat = (' ' + data[pos][1] + ' ' * 100)[:self.gameswin.getmaxyx()[1] - 3] + ' '
+                self.gameswin.addstr(i + 1, 1, dat, style)
+                dat = (' ' + data[pos][0] + ' ' * 100)[:self.syswin.getmaxyx()[1] - 3] + ' '
+                self.syswin.addstr(i + 1, 1, dat, style)
+            else:
+                self.gameswin.addstr(i + 1, 1, (' '*100)[:self.gameswin.getmaxyx()[1] - 2])
+                self.syswin.addstr(i + 1, 1, (' '*100)[:self.syswin.getmaxyx()[1] - 2])
+            pos += 1
         self.syswin.refresh()
         self.gameswin.refresh()
 
@@ -88,18 +97,70 @@ class GameMenu(object):
                 self.offset -= 1
         self.draw()
 
+    def center(self, pos):
+        if (pos >= 0) and (pos < len(data)):
+            half = self.syswin.getmaxyx()[0] / 2
+            self.offset = max(pos - half, 0)
+            self.pos = pos - self.offset
+        self.draw()
+
+    def find_word(self, word):
+        pos = self.list_pos()
+        for i in range(pos, len(data)):
+            if (word in data[i][0]) or (word in data[i][1]):
+                return i
+        for i in range(pos):
+            if (word in data[i][0]) or (word in data[i][1]):
+                return i
+        return -1
+
+    def find_next(self, word):
+        pos = self.list_pos() + 1
+        if pos >= len(data):
+            pos = 0
+        for i in range(pos, len(data)):
+            if (word in data[i][0]) or (word in data[i][1]):
+                return i
+        for i in range(pos):
+            if (word in data[i][0]) or (word in data[i][1]):
+                return i
+        return -1
+
+    def find_prev(self, word):
+        if len(data) == 0:
+            return -1
+        pos = self.list_pos() - 1
+        if pos < 0:
+            pos = len(data) - 1
+        for i in range(pos, -1, -1):
+            if (word in data[i][0]) or (word in data[i][1]):
+                return i
+        for i in range(len(data) - 1, pos, -1):
+            if (word in data[i][0]) or (word in data[i][1]):
+                return i
+        return -1
+
 
 def main_loop(game_menu, search_window):
     while 1:
         c = mainwindow.getch()
         if c == ord('/'):
-            search_window.enter()
+            word = search_window.enter()
+            found = game_menu.find_word(word)
+            game_menu.center(found)
         if c == ord('j') or c == curses.KEY_DOWN:
             game_menu.move_down()
-        if c == ord('k'):
+        if c == ord('k') or c == curses.KEY_UP:
             game_menu.move_up()
+        if c == ord('n'):
+            word = search_window.text.gather().strip()
+            found = game_menu.find_next(word)
+            game_menu.center(found)
+        if c == ord('N'):
+            word = search_window.text.gather().strip()
+            found = game_menu.find_prev(word)
+            game_menu.center(found)
         if c == ord('\n') or c == ord('l'):
-            # search_window.swin.addstr(1, 1, data[game_menu.list_pos()][1])
             search_window.draw()
         if c == ord('q') or c == 27:
             return
