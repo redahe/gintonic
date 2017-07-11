@@ -15,8 +15,6 @@ data = [('NES', 'sobaka'), ('NES', 'glaza'), ('MegaDrive', 'konskiy look'),
 for i in range(len(data)):
     data[i] = (data[i][0], '_'+str(i)+'_'+data[i][1])
 
-search_history = collections.deque(maxlen=100)
-
 
 class SearchWindow(object):
 
@@ -26,26 +24,39 @@ class SearchWindow(object):
         self.swin.border()
         self.inp = curses.newwin(1, 55, 2, 2)
         self.text = textpad.Textbox(self.inp, insert_mode=False)
+        self.history_point = 0
+        self.search_history = collections.deque(maxlen=100)
 
     def draw(self):
         self.swin.refresh()
         self.inp.refresh()
 
     def _handle_key(self, x):
+        if x == curses.KEY_UP:
+            if self.history_point < len(self.search_history):
+                self.history_point += 1
+                self.inp.erase()
+                self.inp.addstr(0, 0, self.search_history[-self.history_point])
+        if x == curses.KEY_DOWN:
+            if self.history_point > 1:
+                self.history_point -= 1
+                self.inp.erase()
+                self.inp.addstr(0, 0, self.search_history[-self.history_point])
         if x == 10:
             return 7
         return x
 
     def enter(self):
+        self.history_point = 0
         curses.curs_set(1)
         curses.setsyx(2, 2)
         curses.doupdate()
         self.inp.erase()
-        res = self.text.edit(self._handle_key)
-        # self.text.
-        search_history.append(res)
+        res = self.text.edit(self._handle_key).strip()
+        if not(self.search_history) or self.search_history[-1] != res:
+            self.search_history.append(res)
         curses.curs_set(0)
-        return res.strip()
+        return res
 
 
 class GameMenu(object):
