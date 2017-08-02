@@ -1,19 +1,40 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import curses
 import curses.textpad as textpad
 import collections
+import ConfigParser
+import logging
+import subprocess
 
+LOG_FORMAT = '%(asctime)s %(message)s'
+logging.basicConfig(stream=sys.stderr, level=logging.INFO, format=LOG_FORMAT)
+
+
+WORK_DIR = os.path.join(os.path.expanduser('~'), '.gintonic')
+CONFIG_FILE = os.path.join(WORK_DIR, 'config')
+
+SECTION = 'CONFIG'
+PATH_TO_GAMES = 'path_to_games'
+
+config = ConfigParser.ConfigParser()
 
 mainwindow = curses.initscr()
 
-data = [('NES', 'sobaka'), ('NES', 'glaza'), ('MegaDrive', 'konskiy look'),
-        ('MegaDrive', 'changeme'), ('MegaDrive', 'brbasasasasasasasas'),
-        ('PSX', 'shamanskiy buben ahahahahahahahhaahahhahaahahhaahhahaahahhahahahaahhaahhahahahahaha')] * 10
+data = []
 
-for i in range(len(data)):
-    data[i] = (data[i][0], '_'+str(i)+'_'+data[i][1])
+
+def read_config():
+    logging.info('Reading config: ' + CONFIG_FILE)
+    config.read(CONFIG_FILE)
+    global path_to_games
+    path_to_games = config.get(SECTION, PATH_TO_GAMES)
+
+
+def check_find(word, item):
+    return word.upper() in item[0].upper() or word.upper() in item[1].upper()
 
 
 class SearchWindow(object):
@@ -42,6 +63,9 @@ class SearchWindow(object):
                 self.history_point -= 1
                 self.inp.erase()
                 self.inp.addstr(0, 0, self.search_history[-self.history_point])
+        if x == 27:
+            self.canceled = True
+            return 7
         if x == 10:
             return 7
         return x
@@ -52,10 +76,15 @@ class SearchWindow(object):
         curses.setsyx(2, 2)
         curses.doupdate()
         self.inp.erase()
+        self.canceled = False
         res = self.text.edit(self._handle_key).strip()
-        if not(self.search_history) or self.search_history[-1] != res:
-            self.search_history.append(res)
         curses.curs_set(0)
+        if self.canceled:
+            self.inp.erase()
+            self.inp.refresh()
+            return ''
+        elif (not(self.search_history) or self.search_history[-1] != res):
+                self.search_history.append(res)
         return res
 
 
@@ -70,9 +99,14 @@ class GameMenu(object):
         self.gameswin.border()
         self.offset = 0
         self.pos = 0
+        self.search_pos = 0
 
     def list_pos(self):
         return self.offset + self.pos
+
+    def current_game(self):
+        if data:
+            return data[self.list_pos()]
 
     def draw(self):
         pos = self.offset
@@ -118,10 +152,10 @@ class GameMenu(object):
     def find_word(self, word):
         pos = self.list_pos()
         for i in range(pos, len(data)):
-            if (word in data[i][0]) or (word in data[i][1]):
+            if check_find(word, data[i]):
                 return i
         for i in range(pos):
-            if (word in data[i][0]) or (word in data[i][1]):
+            if check_find(word, data[i]):
                 return i
         return -1
 
@@ -130,10 +164,10 @@ class GameMenu(object):
         if pos >= len(data):
             pos = 0
         for i in range(pos, len(data)):
-            if (word in data[i][0]) or (word in data[i][1]):
+            if check_find(word, data[i]):
                 return i
         for i in range(pos):
-            if (word in data[i][0]) or (word in data[i][1]):
+            if check_find(word, data[i]):
                 return i
         return -1
 
@@ -144,12 +178,23 @@ class GameMenu(object):
         if pos < 0:
             pos = len(data) - 1
         for i in range(pos, -1, -1):
-            if (word in data[i][0]) or (word in data[i][1]):
+            if check_find(word, data[i]):
                 return i
         for i in range(len(data) - 1, pos, -1):
-            if (word in data[i][0]) or (word in data[i][1]):
+            if check_find(word, data[i]):
                 return i
         return -1
+
+
+def launch_game(game_tuple):
+    system = game_tuple[0]
+    game = game_tuple[1]
+    full_path = os.path.join(path_to_games, system, game)
+    args = config.get(SECTION, 'run_'+system).format(full_path)
+    origWD = os.getcwd()
+    os.chdir(os.path.dirname(CONFIG_FILE))
+    subprocess.call(args, shell=True)
+    os.chdir(origWD)
 
 
 def main_loop(game_menu, search_window):
@@ -172,19 +217,29 @@ def main_loop(game_menu, search_window):
             found = game_menu.find_prev(word)
             game_menu.center(found)
         if c == ord('\n') or c == ord('l'):
+            mainwindow.clear()
+            cg = game_menu.current_game()
+            curses.endwin()
+            print('RUNNING: ' + str(cg))
+            launch_game(cg)
+            curses.flushinp()
+            curses.doupdate()
             search_window.draw()
-        if c == ord('q') or c == 27:
+            game_menu.draw()
+        if c == ord('q'):
             return
 
 
 def main():
+    read_config()
+    make_index(path_to_games)
     try:
         mainwindow.keypad(1)
         curses.noecho()
         curses.cbreak()
         curses.curs_set(0)
         mainwindow.addstr(mainwindow.getmaxyx()[0] - 1, 1,
-                          '"l" - launch, "/"  - search, "n" - next, "N" - prev, "j" - down, "k" - up, q - quit')
+                          '"l" - launch, "/"  - search, "n" - next, "N" - prev, "j" - down, "k" - up, "q" - quit')
         mainwindow.refresh()
         sw = SearchWindow()
         gm = GameMenu(mainwindow)
@@ -199,12 +254,14 @@ def main():
 
 
 def make_index(path):
-    index = {}
+    global data
     systems = os.listdir(path)
     for system in systems:
-        games = os.listdir(path + os.sep + system)
-        index[system] = games
-    return index
+        if os.path.isdir(path + os.sep + system):
+            games = os.listdir(path + os.sep + system)
+            for game in games:
+                data.append((system, game))
+    data.sort()
 
 
 if __name__ == '__main__':

@@ -1,0 +1,3 @@
+[CONFIG]
+path_to_games = /home/reda/games
+run_dos = ./dos.sh {0}
