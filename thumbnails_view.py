@@ -4,7 +4,7 @@ import logging
 from subprocess import Popen, PIPE
 
 
-W3M_BIN = '/usr1/lib/w3m/w3mimgdisplay'
+W3M_BIN = '/usr/lib/w3m/w3mimgdisplay'
 THUMBS_SUBFOLDER = 'thumbnails'
 
 
