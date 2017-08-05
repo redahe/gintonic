@@ -19,6 +19,9 @@ CONFIG_FILE = os.path.join(WORK_DIR, 'config')
 SECTION = 'CONFIG'
 PATH_TO_GAMES = 'path_to_games'
 
+SYSTEM_WIDTH = 15
+GAME_WIDTH = 44
+
 config = ConfigParser.ConfigParser()
 
 mainwindow = curses.initscr()
@@ -41,14 +44,18 @@ class SearchWindow(object):
 
     def __init__(self):
         self.swin = curses.newwin(4, 59, 0, 0)
-        self.swin.addstr(1, 20, 'Search Game')
-        self.swin.border()
         self.inp = curses.newwin(1, 55, 2, 2)
         self.text = textpad.Textbox(self.inp, insert_mode=False)
         self.history_point = 0
         self.search_history = collections.deque(maxlen=100)
 
+    def resize(self):
+        self.swin.resize(4, 59)
+        self.inp.resize(1, 55)
+
     def draw(self):
+        self.swin.addstr(1, 20, 'Search Game')
+        self.swin.border()
         self.swin.refresh()
         self.inp.refresh()
 
@@ -93,13 +100,19 @@ class GameMenu(object):
     def __init__(self, mainwindow):
         self.main = mainwindow
         size = mainwindow.getmaxyx()
-        self.syswin = curses.newwin(size[0]-5, 15, 4, 0)
-        self.syswin.border()
-        self.gameswin = curses.newwin(size[0]-5, 44, 4, 15)
-        self.gameswin.border()
+        self.syswin = curses.newwin(size[0]-5, SYSTEM_WIDTH, 4, 0)
+        self.gameswin = curses.newwin(size[0]-5, GAME_WIDTH, 4, SYSTEM_WIDTH)
         self.offset = 0
         self.pos = 0
         self.search_pos = 0
+
+    def resize(self):
+        size = self.main.getmaxyx()
+        if (size[0] > 10) and (size[1] > 20):
+            self.syswin.resize(size[0]-5, min(SYSTEM_WIDTH, size[1]))
+            self.gameswin.resize(size[0]-5, min(GAME_WIDTH, max(0, size[1] - SYSTEM_WIDTH)))
+            self.syswin.mvwin(4, 0)
+            self.gameswin.mvwin(4, 15)
 
     def list_pos(self):
         return self.offset + self.pos
@@ -123,6 +136,11 @@ class GameMenu(object):
                 self.gameswin.addstr(i + 1, 1, (' '*100)[:self.gameswin.getmaxyx()[1] - 2])
                 self.syswin.addstr(i + 1, 1, (' '*100)[:self.syswin.getmaxyx()[1] - 2])
             pos += 1
+        self.main.addstr(self.main.getmaxyx()[0] - 1, 0,
+                         '"q"-quit, "l"-launch, "/"- search, "n"-next, "N"-prev, "j"-down, "k"-up'[:self.main.getmaxyx()[1]-1])
+        self.main.refresh()
+        self.syswin.border()
+        self.gameswin.border()
         self.syswin.refresh()
         self.gameswin.refresh()
 
@@ -186,7 +204,13 @@ class GameMenu(object):
         return -1
 
 
+game_menu = None
+search_window = None
+
+
 def launch_game(game_tuple):
+    curses.endwin()
+    print('RUNNING: ' + str(game_tuple))
     system = game_tuple[0]
     game = game_tuple[1]
     full_path = os.path.join(path_to_games, system, game)
@@ -195,9 +219,28 @@ def launch_game(game_tuple):
     os.chdir(os.path.dirname(CONFIG_FILE))
     subprocess.call(args, shell=True)
     os.chdir(origWD)
+    init_curses()
+    curses.flushinp()
+    search_window.draw()
+    game_menu.draw()
 
 
-def main_loop(game_menu, search_window):
+def init_curses():
+    mainwindow.keypad(1)
+    curses.noecho()
+    curses.cbreak()
+    curses.curs_set(0)
+
+
+def do_resize():
+    mainwindow.clear()
+    game_menu.resize()
+    search_window.resize()
+    game_menu.draw()
+    search_window.draw()
+
+
+def main_loop():
     while 1:
         c = mainwindow.getch()
         if c == ord('/'):
@@ -217,39 +260,27 @@ def main_loop(game_menu, search_window):
             found = game_menu.find_prev(word)
             game_menu.center(found)
         if c == ord('\n') or c == ord('l'):
-            mainwindow.clear()
             cg = game_menu.current_game()
-            curses.endwin()
-            print('RUNNING: ' + str(cg))
             launch_game(cg)
-            curses.flushinp()
-            curses.doupdate()
-            search_window.draw()
-            game_menu.draw()
         if c == ord('q'):
             return
+        if c == curses.KEY_RESIZE:
+            do_resize()
 
 
 def main():
     read_config()
     make_index(path_to_games)
     try:
-        mainwindow.keypad(1)
-        curses.noecho()
-        curses.cbreak()
-        curses.curs_set(0)
-        mainwindow.addstr(mainwindow.getmaxyx()[0] - 1, 1,
-                          '"l" - launch, "/"  - search, "n" - next, "N" - prev, "j" - down, "k" - up, "q" - quit')
-        mainwindow.refresh()
-        sw = SearchWindow()
-        gm = GameMenu(mainwindow)
-        gm.draw()
-        sw.draw()
-        main_loop(gm, sw)
+        init_curses()
+        global game_menu
+        global search_window
+        search_window = SearchWindow()
+        game_menu = GameMenu(mainwindow)
+        game_menu.draw()
+        search_window.draw()
+        main_loop()
     finally:
-        # curses.nocbreak()
-        # mainwindow.keypad(0)
-        # curses.echo()
         curses.endwin()
 
 
