@@ -61,7 +61,8 @@ class PreviewWindow(object):
             if exited:
                 return
             time.sleep(0.01)
-            if self.last_game_loaded == self.game.current_game():
+            to_load = self.game.current_game()
+            if self.last_game_loaded == to_load:
                 continue
             if self.main.getmaxyx()[1] < GAME_WIDTH + SYSTEM_WIDTH + 2 + 10:
                 continue
@@ -78,7 +79,7 @@ class PreviewWindow(object):
                     thumbs.draw_image(cords[0]+3 + (im_size_y+1)*i, cords[1]+2, im_size_y, im_size_x, thms[i])
                 else:
                     thumbs.clean(cords[0]+3 + (im_size_y+1)*i, cords[1]+2, im_size_y, im_size_x)
-            self.last_game_loaded == self.game.current_game()
+            self.last_game_loaded == to_load
 
     def draw(self):
         if self.main.getmaxyx()[1] < GAME_WIDTH + SYSTEM_WIDTH + 2 + 10:
@@ -90,12 +91,6 @@ class PreviewWindow(object):
         else:
             self.win.addstr(1, 2, 'Preview isn\'t avail. See logs')
             return
-        im_size_x = self.win.getmaxyx()[1] - 4
-        im_size_y = int(im_size_x * (3.0 / 4) * (thumbs.cellx*1.0 / thumbs.celly))
-        cords = self.win.getbegyx()
-        for i in range(2):
-            if 3 + (im_size_y+1)*(i+1) > self.win.getmaxyx()[0]:
-                thumbs.clean(cords[0]+3 + (im_size_y+1)*i, cords[1]+2, im_size_y, im_size_x)
 
     def resize(self):
         self.last_game_loaded = None
@@ -286,7 +281,10 @@ def launch_game(game_tuple):
     args = config.get(SECTION, 'run_'+system).format(full_path)
     origWD = os.getcwd()
     os.chdir(os.path.dirname(CONFIG_FILE))
-    subprocess.call(args, shell=True)
+    try:
+        subprocess.call(args, shell=True)
+    except Exception as e:
+        logging.exception(e)
     os.chdir(origWD)
     init_curses()
     curses.flushinp()

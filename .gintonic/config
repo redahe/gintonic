@@ -1,3 +1,4 @@
 [CONFIG]
-path_to_games = /home/reda/games
-run_dos = ./dos.sh {0}
+path_to_games = /mnt/mediaplayer/games
+run_dos = DISPLAY=:0 ./dos.sh {0}
+run_psx = DISPLAY=:0 retroarch -L /usr/lib/libretro/pcsx_rearmed_libretro.so {0}/*.img
