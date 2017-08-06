@@ -1,4 +1,5 @@
 [CONFIG]
 path_to_games = /mnt/mediaplayer/games
 run_dos = DISPLAY=:0 ./dos.sh {0}
-run_psx = DISPLAY=:0 retroarch -L /usr/lib/libretro/pcsx_rearmed_libretro.so {0}/*.img
+run_psx = DISPLAY=:0 ./psx.sh {0}
+
