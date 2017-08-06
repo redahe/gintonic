@@ -2,7 +2,7 @@
 
 gintonic - is a lightweight game launcher, that works in terminal. It is designed to be fast, to be comfortable for keyboard users and to work through ssh.
 
-![Alt text]((screen_shot.png?raw=true "gintonic"))
+![Alt text](screen_shot.png?raw=true "gintonic")
 
 ## Features
 
