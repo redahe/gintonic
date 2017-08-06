@@ -40,9 +40,13 @@ def draw_image(starty, startx, sizey, sizex, path):
         return
     inpline = "0;1;{};{};{};{};;;;;{}\n4;\n3;\n".format(
         startx*cellx, starty*celly, sizex*cellx, sizey*celly, path)
-    process.stdin.write(inpline)
-    process.stdin.flush()
-    process.stdout.readline()
+    try:
+        process.stdin.write(inpline)
+        process.stdin.flush()
+        process.stdout.readline()
+    except IOError:
+        if process.poll():
+            init()
 
 
 def clean(starty, startx, sizey, sizex):
@@ -50,9 +54,13 @@ def clean(starty, startx, sizey, sizex):
         return
     inpline = "6;{};{};{};{}\n4;\n3;\n".format(
         startx*cellx+2, starty*celly+2, sizex*cellx, sizey*celly)
-    process.stdin.write(inpline)
-    process.stdin.flush()
-    process.stdout.readline()
+    try:
+        process.stdin.write(inpline)
+        process.stdin.flush()
+        process.stdout.readline()
+    except IOError:
+        if process.poll():
+            init()
 
 
 def get_thumbs(game_folder):

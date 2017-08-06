@@ -283,8 +283,8 @@ def launch_game(game_tuple):
     os.chdir(os.path.dirname(CONFIG_FILE))
     try:
         subprocess.call(args, shell=True)
-    except Exception as e:
-        logging.exception(e)
+    except KeyboardInterrupt:
+        pass
     os.chdir(origWD)
     init_curses()
     curses.flushinp()
@@ -355,13 +355,12 @@ def main():
         preview_thread = threading.Thread(target=preview_window.preview_work)
         preview_thread.start()
         do_resize()
-        # game_menu.draw()
-        # search_window.draw()
-        # preview_window.draw()
         main_loop()
+    except Exception as e:
+        logging.exception(e)
     finally:
         exited = True
-        if preview_thread:
+        if preview_thread and preview_thread.is_alive():
             preview_thread.join()
         curses.endwin()
 
