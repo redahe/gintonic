@@ -48,7 +48,7 @@ def draw_image(starty, startx, sizey, sizex, path):
 def clean(starty, startx, sizey, sizex):
     if not process:
         return
-    inpline = "6;{};{};{};{};\n4;\n3;\n".format(
+    inpline = "6;{};{};{};{}\n4;\n3;\n".format(
         startx*cellx+2, starty*celly+2, sizex*cellx, sizey*celly)
     process.stdin.write(inpline)
     process.stdin.flush()
