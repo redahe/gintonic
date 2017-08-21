@@ -60,6 +60,8 @@ class PreviewWindow(object):
         while True:
             if exited:
                 return
+            if not(thumbs.process):
+                return
             time.sleep(0.01)
             to_load = self.game.current_game()
             if self.last_game_loaded == to_load:
@@ -89,7 +91,7 @@ class PreviewWindow(object):
         if thumbs.process:
             self.win.addstr(1, 2, 'Preview')
         else:
-            self.win.addstr(1, 2, 'Preview isn\'t avail. See logs')
+            self.win.addstr(1, 2, 'Preview isn\'t avail.')
             return
 
     def resize(self):
@@ -273,7 +275,7 @@ preview_window = None
 
 
 def launch_game(game_tuple):
-    curses.endwin()
+    close_curses()
     print('RUNNING: ' + str(game_tuple))
     system = game_tuple[0]
     game = game_tuple[1]
@@ -297,6 +299,14 @@ def init_curses():
     curses.noecho()
     curses.cbreak()
     curses.curs_set(0)
+
+
+def close_curses():
+    mainwindow.keypad(0)
+    curses.echo()
+    curses.nocbreak()
+    curses.curs_set(2)
+    curses.endwin()
 
 
 def do_resize():
@@ -340,10 +350,10 @@ def main_loop():
 
 def main():
     global exited
-    read_config()
-    make_index(path_to_games)
     preview_thread = None
     try:
+        read_config()
+        make_index(path_to_games)
         thumbs.init()
         init_curses()
         global game_menu
@@ -362,7 +372,7 @@ def main():
         exited = True
         if preview_thread and preview_thread.is_alive():
             preview_thread.join()
-        curses.endwin()
+        close_curses()
 
 
 def make_index(path):
